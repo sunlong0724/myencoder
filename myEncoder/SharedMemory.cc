@@ -9,8 +9,17 @@ namespace Memory
 	SharedMemory::SharedMemory():is_opened(false){}
 
 	bool SharedMemory::open(std::string file_name) {
+#if _FILE_SOURCE
+		m_fp = fopen(file_name.c_str(), "rb");
+		if (m_fp) {
+			width = 1920;
+			height = 1080;
+			return is_opened = true;;
+		}
+#endif
+
 		is_opened = false;
-		fileMappingHandle = OpenFileMapping(PAGE_READONLY, FALSE, file_name.c_str());
+		fileMappingHandle = OpenFileMapping(PAGE_READONLY | PAGE_READWRITE, FALSE, file_name.c_str());
 		if (NULL == fileMappingHandle) {
 			return is_opened;
 		}
@@ -42,6 +51,16 @@ namespace Memory
 	}
 
 	int SharedMemory::read(unsigned char* buffer, int size) {
+#if _FILE_SOURCE
+		int nByteRead = 0;
+		if (0 >= (nByteRead=fread(buffer, 1, size, m_fp))) {
+			fseek(m_fp, 0, SEEK_SET);
+			return fread(buffer, 1, size, m_fp);
+		}
+		return nByteRead;
+#endif
+
+
 		int head = getHeadPos();
 		int tail = getTailPos();
 
@@ -94,6 +113,10 @@ namespace Memory
 	}
 
 	void SharedMemory::close() {
+#if _FILE_SOURCE
+		fclose(m_fp);
+		return;
+#endif
 		if (fileMappingView)
 			UnmapViewOfFile(fileMappingView);
 		if (fileMappingHandle)

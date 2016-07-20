@@ -45,6 +45,11 @@ namespace Memory
 		void setHeadPos(int pos);
 
 		void close();
+
+#if _FILE_SOURCE
+		FILE*			m_fp;
+#endif
+
 	};
 };
 

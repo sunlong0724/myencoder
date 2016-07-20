@@ -1,6 +1,7 @@
 
 #include "Rtmp264.h"
 #include <math.h>
+#include <stdio.h>
 
 int CRtmp264::InitSockets(){
 #ifdef WIN32     
@@ -22,7 +23,6 @@ void CRtmp264::CleanupSockets()
 
 int CRtmp264::RTMP264_Connect(const char* url)	{
 	InitSockets();
-	m_get_sps_pps = false;
 	m_pRtmp = NULL;
 	m_tick = 0;
 	m_tick_gap = 0;
@@ -64,6 +64,9 @@ void CRtmp264::RTMP264_Close()
 		if (m_metaData.Sps) {
 			delete[] m_metaData.Sps;
 		}
+		if (m_metaData.sei) {
+			delete[] m_metaData.sei;
+		}
 
 		RTMP_Close(m_pRtmp);
 		RTMP_Free(m_pRtmp);
@@ -74,22 +77,28 @@ void CRtmp264::RTMP264_Close()
 
 void CRtmp264::peekSpsAndPps(unsigned char* buf, int buf_size) {
 	int i = 0;
-	int sps_start = 0;
-	int sps_end = 0;
-	int pps_start = 0;
-	int pps_end = 0;
+	int sps_start = 0, sps_end = 0, pps_start = 0, pps_end = 0, sei_start = 0, sei_end = 0;
 	for (int i = 0; i < buf_size; ++i) {
-		if (buf[i] == 0x00 && buf[i + 1] == 0x00 && buf[i + 2] == 0x00 && buf[i + 3] == 0x01) {
-			if (buf[i + 4] == 0x27) {//sps
-				sps_start = i;
-				continue;
+		if (buf[i] == 0x00 && buf[i + 1] == 0x00) {
+			if (buf[i + 2] == 0x00 && buf[i + 3] == 0x01) {
+				if (buf[i + 4] == 0x27) {//sps
+					sps_start = i + 4;
+					continue;
+				}
+				else if (buf[i + 4] == 0x28) {//pps
+					sps_end = i;
+					pps_start = i + 4;
+					continue;
+				}
+				else if (buf[i + 4] == 0x06) {//sei and I/P slice
+					pps_end = i;
+					sei_start = i + 4;
+					//break;
+					continue;
+				}
 			}
-			else if (buf[i + 4] == 0x28) {//pps
-				pps_start = sps_end = i;
-				continue;
-			}
-			else if (buf[i + 4] == 0x06) {//sei and slice
-				pps_end = i;
+			else if (buf[i + 2] == 0x01 &&( buf[i + 3] == 0x21 || buf[i + 3] == 0x25) ) {
+				sei_end = i;
 				break;
 			}
 		}
@@ -97,37 +106,78 @@ void CRtmp264::peekSpsAndPps(unsigned char* buf, int buf_size) {
 	m_metaData.nSpsLen = sps_end - sps_start;
 	m_metaData.Sps = NULL;
 	m_metaData.Sps = (unsigned char*)malloc(m_metaData.nSpsLen);
+	memset(m_metaData.Sps, 0x00, m_metaData.nSpsLen);
 	memcpy(m_metaData.Sps, &buf[sps_start], m_metaData.nSpsLen);
 
 
 	m_metaData.nPpsLen = pps_end - pps_start;
 	m_metaData.Pps = NULL;
 	m_metaData.Pps = (unsigned char*)malloc(m_metaData.nPpsLen);
+	memset(m_metaData.Pps, 0x00, m_metaData.nPpsLen);
 	memcpy(m_metaData.Pps, &buf[pps_start], m_metaData.nPpsLen);
+
+	m_metaData.nSeiLen = sei_end - sei_start;
+	m_metaData.sei = NULL;
+	m_metaData.sei = (unsigned char*)malloc(m_metaData.nSeiLen);
+	memset(m_metaData.sei, 0x00, m_metaData.nSeiLen);
+	memcpy(m_metaData.sei, &buf[sei_start], m_metaData.nSeiLen);
+
+}
+
+int peekUalus(unsigned char *buf, int buf_size, NaluUnit& nalu) {
+
+	int nalu_start = 0, nalu_end = 0;
+
+	for (int i = 0; i < buf_size; ++i){
+		if (buf[i] == 0x00 && buf[i + 1] == 0x00 && buf[i + 2] == 0x00 && buf[i + 3] == 0x01) {
+			nalu_start = i + 4;
+			continue;
+		}
+		if (buf[i] == 0x00 && buf[i + 1] == 0x00 && buf[i + 2] == 0x00 && buf[i + 3] == 0x01) {
+			nalu_start = i;
+			break;
+		}
+	}
+	return 0;
 }
 
 int CRtmp264:: RTMP264_Send(unsigned char *buf, int buf_size){
 	int bKeyframe = buf[5] == 0x10 ? TRUE : FALSE;
-	if (m_get_sps_pps) {
+	//split nalu
+	
+
+
+	if (bKeyframe) {
 		memset(&m_metaData, 0, sizeof(RTMPMetadata));
 		peekSpsAndPps(buf, buf_size);
 
 		// 解码SPS,获取视频图像宽、高信息   
-		int width = 0, height = 0, fps = 0;
-		h264_decode_sps(m_metaData.Sps, m_metaData.nSpsLen, width, height, fps);
-		//m_metaData.nWidth = width;  
-		//m_metaData.nHeight = height;  
+		int width = 0, height = 0, fps = 0, level_idc = 0;
+		h264_decode_sps(m_metaData.Sps, m_metaData.nSpsLen, width, height, fps, level_idc);
+		m_metaData.nWidth = width;  
+		m_metaData.nHeight = height;  
+		m_metaData.nFrameRate = fps;
+		m_metaData.level_idc = level_idc;
 		if (fps)
 			m_metaData.nFrameRate = fps;
 		else
 			m_metaData.nFrameRate = 25;
-			
+
+		m_tick_gap = 1000 / m_metaData.nFrameRate;
 		//except aud
-		return SendH264Packet(buf+6, buf_size-6, bKeyframe, m_tick);
+		return SendH264Packet(buf+  6 + 4 + m_metaData.nSpsLen  + 4 + m_metaData.nPpsLen + 4 + m_metaData.nSeiLen + 3, buf_size - 6 - 4 - m_metaData.nSpsLen - 4 -m_metaData.nPpsLen - 4- m_metaData.nSeiLen - 3, bKeyframe, m_tick);
 	}
 
 	m_tick += m_tick_gap;
-	return SendH264Packet(buf+6, buf_size-6, bKeyframe, m_tick);
+	//pick I/P frame
+	int i = 0;
+	while (1) {
+		if (buf[i] == 0x00 && buf[i + 1] == 0x00 && buf[i + 2] == 0x01 && buf[i + 3] == 0x21) {
+			break;
+		}
+		++i;
+	}
+	return SendH264Packet(buf + i+ 3, buf_size -i -3, bKeyframe, m_tick);
 }
 
 
@@ -156,10 +206,71 @@ int CRtmp264::SendPacket(unsigned int nPacketType, unsigned char *data, unsigned
 	if (RTMP_IsConnected(m_pRtmp))
 	{
 		nRet = RTMP_SendPacket(m_pRtmp, packet, TRUE); /*TRUE为放进发送队列,FALSE是不放进发送队列,直接发送*/
+		fprintf(stdout, "%s RTMP_SendPacket:%d\n", __FUNCTION__,nRet);
 	}
 	/*释放内存*/
 	free(packet);
 	return nRet;
+}
+
+char * put_byte(char *output, uint8_t nVal)
+{
+	output[0] = nVal;
+	return output + 1;
+}
+char * put_be16(char *output, uint16_t nVal)
+{
+	output[1] = nVal & 0xff;
+	output[0] = nVal >> 8;
+	return output + 2;
+}
+char * put_be24(char *output, uint32_t nVal)
+{
+	output[2] = nVal & 0xff;
+	output[1] = nVal >> 8;
+	output[0] = nVal >> 16;
+	return output + 3;
+}
+char * put_be32(char *output, uint32_t nVal)
+{
+	output[3] = nVal & 0xff;
+	output[2] = nVal >> 8;
+	output[1] = nVal >> 16;
+	output[0] = nVal >> 24;
+	return output + 4;
+}
+
+char *  put_be64(char *output, uint64_t nVal)
+{
+	output = put_be32(output, nVal >> 32);
+	output = put_be32(output, nVal);
+	return output;
+}
+
+char * put_amf_string(char *c, const char *str)
+{
+	uint16_t len = strlen(str);
+	c = put_be16(c, len);
+	memcpy(c, str, len);
+	return c + len;
+}
+char * put_amf_double(char *c, double d)
+{
+	*c++ = AMF_NUMBER;  /* type: Number */
+	{
+		unsigned char *ci, *co;
+		ci = (unsigned char *)&d;
+		co = (unsigned char *)c;
+		co[0] = ci[7];
+		co[1] = ci[6];
+		co[2] = ci[5];
+		co[3] = ci[4];
+		co[4] = ci[3];
+		co[5] = ci[2];
+		co[6] = ci[1];
+		co[7] = ci[0];
+	}
+	return c + 8;
 }
 
 int CRtmp264::SendVideoSpsPps(unsigned char *pps, int pps_len, unsigned char * sps, int sps_len){
@@ -219,6 +330,8 @@ int CRtmp264::SendH264Packet(unsigned char *data, unsigned int size, int bIsKeyF
 	if (data == NULL && size<11) {
 		return false;
 	}
+
+	printf("%s key(%d) %0x %0x %0x %0x %0x\n", __FUNCTION__, bIsKeyFrame, data[0], data[1], data[2], data[3], data[4]);
 
 	unsigned char *body = (unsigned char*)malloc(size + 9);
 	memset(body, 0, size + 9);
@@ -295,10 +408,15 @@ void CRtmp264::de_emulation_prevention(BYTE* buf, unsigned int* buf_size)
 	return;
 }
 
-int CRtmp264::h264_decode_sps(BYTE * buf, unsigned int nLen, int &width, int &height, int &fps)
+int CRtmp264::h264_decode_sps(BYTE * tmp_buf, unsigned int nLen, int &width, int &height, int &fps, int& level_idc)
 {
 	UINT StartBit = 0;
 	fps = 0;
+
+	BYTE* buf = new BYTE[nLen];
+	memset(buf, 0x00, nLen);
+	memcpy(buf, tmp_buf, nLen);
+
 	de_emulation_prevention(buf, &nLen);
 
 	int forbidden_zero_bit = u(1, buf, StartBit);
@@ -312,7 +430,8 @@ int CRtmp264::h264_decode_sps(BYTE * buf, unsigned int nLen, int &width, int &he
 		int constraint_set2_flag = u(1, buf, StartBit);//(buf[1] & 0x20)>>5;
 		int constraint_set3_flag = u(1, buf, StartBit);//(buf[1] & 0x10)>>4;
 		int reserved_zero_4bits = u(4, buf, StartBit);
-		int level_idc = u(8, buf, StartBit);
+		
+		level_idc = u(8, buf, StartBit);
 
 		int seq_parameter_set_id = Ue(buf, nLen, StartBit);
 
@@ -415,10 +534,13 @@ int CRtmp264::h264_decode_sps(BYTE * buf, unsigned int nLen, int &width, int &he
 				fps = time_scale / (2 * num_units_in_tick);
 			}
 		}
+		delete[] buf;
 		return true;
 	}
-	else
+	else {
+		delete[] buf;
 		return false;
+	}
 }
 
 UINT CRtmp264::Ue(BYTE *pBuff, UINT nLen, UINT &nStartBit)

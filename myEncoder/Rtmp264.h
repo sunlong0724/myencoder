@@ -22,6 +22,9 @@ typedef struct _RTMPMetadata
 	unsigned char   *Sps;
 	unsigned int    nPpsLen;
 	unsigned char   *Pps;
+	unsigned char	*sei;
+	unsigned int	nSeiLen;
+	int				level_idc;
 } RTMPMetadata, *LPRTMPMetadata;
 
 /**
@@ -63,7 +66,7 @@ private:
 
 	* @成功则返回1 , 失败则返回0
 	*/
-	int h264_decode_sps(BYTE * buf, unsigned int nLen, int &width, int &height, int &fps);
+	int h264_decode_sps(BYTE * buf, unsigned int nLen, int &width, int &height, int &fps, int& level_idc);
 	UINT Ue(BYTE *pBuff, UINT nLen, UINT &nStartBit);
 	int Se(BYTE *pBuff, UINT nLen, UINT &nStartBit);
 	DWORD u(UINT BitCount, BYTE * buf, UINT &nStartBit);
@@ -148,7 +151,6 @@ private:
 	RTMPMetadata	m_metaData;
 	int				m_tick;
 	int				m_tick_gap;
-	bool			m_get_sps_pps;
 };
 #endif // !__RTMP_264_H__
 
