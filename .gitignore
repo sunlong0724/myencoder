@@ -1,5 +1,4 @@
 /build
-/output
 /sln
 /third_part/boost_1_59_0/*
 /third_part/ffmpeg/*
@@ -23,9 +22,7 @@
 *.aac
 *.mov
 *.pcm
-*.lib
 */Debug
 */*.db
-*.dll
 *.exe
 ffmpeg_writer/ffmpeg_writer/3rdParty/*
