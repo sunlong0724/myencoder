@@ -1,26 +1,28 @@
-#include "Rtmp264.h"
 #include "myEncoder.h"
 #include "msdk_codec.h"
 #include "FFmpegWriter.h"
 #include "SharedMemory.h"
+#include "FFmpegStreamer.h"
 
 #include "opencv2\opencv.hpp"
 #include <signal.h>
 
 
 #pragma comment(lib, "msdk_codec.lib")
-#pragma comment(lib, "librtmp.lib")
+
 #pragma comment(lib, "ws2_32.lib")
 #ifdef _DEBUG
 #pragma comment(lib, "ffmpeg_writerd.lib")
 #pragma comment(lib, "opencv_highgui246d.lib")
 #pragma comment(lib, "opencv_imgproc246d.lib")
 #pragma comment(lib, "opencv_core246d.lib")
+#pragma comment(lib, "ffmpeg_streamerD.lib")
 #else
 #pragma comment(lib, "ffmpeg_writer.lib")
 #pragma comment(lib, "opencv_highgui246.lib")
 #pragma comment(lib, "opencv_imgproc246.lib")
 #pragma comment(lib, "opencv_core246.lib")
+#pragma comment(lib, "ffmpeg_streamer.lib")
 #endif
 
 
@@ -28,6 +30,7 @@
 typedef struct _CustomStruct {
 	CFFmpegWriter			m_ff_writer;
 	CEncodeThread			m_encoder;
+	CFFmpegStreamer			m_ff_streamer;
 	Memory::SharedMemory	m_sm;
 	char*					m_rgb_buf;
 	int						m_rgb_buf_len;
@@ -45,9 +48,7 @@ typedef struct _CustomStruct {
 
 	std::map<int64_t, std::vector<std::vector<char>>> m_frames;
 
-	char					m_url[256];
-	CRtmp264				m_rtmp264;
-	int						m_rtmp_connect_status;
+	char					m_url[2048];
 
 	_CustomStruct() {
 		m_rgb_buf = NULL;
@@ -60,13 +61,13 @@ typedef struct _CustomStruct {
 
 		memset(m_record_file, 0x00, sizeof m_record_file);
 		memset(m_url, 0x00, sizeof m_url);
-		m_rtmp_connect_status = FALSE;
 	}
 
 }CustomStruct;
 
+
 CustomStruct g_cs;
-std::string paramter("-g 1920x1080 -b 3000 -f 25/1 -gop 25");
+std::string g_paramter;
 
 //read a frame data from ven
 //rgb 2 yuv
@@ -75,7 +76,7 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 	CustomStruct *p = (CustomStruct*)ctx;
 	if (!p->m_sm.isOpened()) {
 #if _FILE_SOURCE
-		if (!p->m_sm.open("e:\\1.yuv")) {
+		if (!p->m_sm.open("e:\\640x480.rgb")) {
 			fprintf(stdout, "SharedMemory open failed!\n");
 			return -1;
 		}
@@ -109,7 +110,7 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 		}
 	}
 
-#if 0
+#if 1
 	int64_t now1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	if (0 == p->m_sm.read((unsigned char*)p->m_rgb_buf, p->m_rgb_buf_len)) {
 		return 0;
@@ -147,6 +148,7 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 
 
 int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
+	int nBytesWritten = 0;
 #if 0
 	static int i = 0;
 	char name[100];
@@ -165,49 +167,58 @@ int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
 	int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	g_cs.m_frames[now].push_back(std::vector<char>(buffer, buffer + buffer_len));//FIXME: maybe race condition!!!
 
-
 	//check wether write videos
 	if (strlen(g_cs.m_record_file) > 0) {
 		int nLen = p_writer->write_video_frame(buffer, buffer_len, buffer[5] == 0x10);
 		if (0 != nLen) {//success
 			fprintf(stdout, "write_video_frame failed!\n");
 		}
+		nBytesWritten = buffer_len;
 	}
 
-	//check whether send
-	//first come must be I
-	if (p->m_rtmp_connect_status) {
-		int64_t now1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		p->m_rtmp264.RTMP264_Send(buffer, buffer_len);
-		int64_t now2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	if (strlen(g_cs.m_url) > 0) {
+		static bool flag = true;
+		if (flag) {
+			if (buffer[5] == 0x10) {
+				flag = false;
+				FILE* fp = fopen("tmp.264", "wb");
+				if (fp) {
+					fwrite(buffer, 1, buffer_len, fp);
+					fclose(fp);
+				}
+				g_cs.m_ff_streamer.connect(g_cs.m_url);
+			}
+		}
 
-		//fprintf(stdout, "%s RTMP264_Send(%d),time(%lld)\n", __FUNCTION__, i,now2 - now1);
-	}
-	else {
-		if (strlen(p->m_url) > 0) {
-			int ret = p->m_rtmp264.RTMP264_Connect(p->m_url);
-			fprintf(stdout, "%s RTMP264_Connect %d\n", __FUNCTION__, ret);
+		if (0 == g_cs.m_ff_streamer.send_video_frame(buffer, buffer_len, buffer[5] == 0x10)) {
+			nBytesWritten = buffer_len;
 		}
 	}
+
+
+
 #endif
-	return buffer_len;
+	return nBytesWritten;
 }
 
 ENCODER_API bool encoder_rtmp_push(char* url) {
-	return g_cs.m_rtmp_connect_status = g_cs.m_rtmp264.RTMP264_Connect(url);
+	strcpy(g_cs.m_url, url);
+	return true;
 }
 
 
-ENCODER_API bool encoder_start(char* record_file_name) {
+ENCODER_API bool encoder_start(char* parameters, char* record_file_name) {
 	//std::string paramter("-g 1920x1080 -b 3000 -f 25/1 -gop 25");
 	//std::string paramter("-g 1920x1080 -b 3000 -f 30/1 -gop 45");
+	g_paramter.assign(parameters);
+
 	if (record_file_name != NULL) {
 		strcpy(g_cs.m_record_file, record_file_name);
-		g_cs.m_ff_writer.initialize(paramter);
+		g_cs.m_ff_writer.initialize(g_paramter);
 		g_cs.m_ff_writer.create_video_file(record_file_name);
 	}
 
-	g_cs.m_encoder.init(paramter.data());
+	g_cs.m_encoder.init(g_paramter.data());
 	g_cs.m_encoder.start(std::bind(ReadNextFrame, std::placeholders::_1, std::placeholders::_2, &g_cs), std::bind(WriteNextFrame, std::placeholders::_1, std::placeholders::_2, &g_cs));
 
 	return true;
@@ -215,9 +226,10 @@ ENCODER_API bool encoder_start(char* record_file_name) {
 
 ENCODER_API bool encoder_stop() {
 	g_cs.m_encoder.stop();
-	g_cs.m_rtmp264.RTMP264_Close();
+
 	g_cs.m_ff_writer.close_video_file();
 	g_cs.m_ff_writer.uninitialize();
+	g_cs.m_ff_streamer.close();
 	
 	cvReleaseImageHeader(&g_cs.m_rgb_image);
 	cvReleaseImageHeader(&g_cs.m_yuv_image);
@@ -239,7 +251,7 @@ void myrun(char* file_name, int time_span, void* ctx) {
 
 	
 	CFFmpegWriter ffwriter;
-	ffwriter.initialize(paramter);
+	ffwriter.initialize(g_paramter);
 	ffwriter.create_video_file(file_name);
 
 	while (start < now) {
@@ -258,9 +270,13 @@ void myrun(char* file_name, int time_span, void* ctx) {
 }
 
 ENCODER_API bool encoder_output(char* file_name, int time_span) {
-	std::thread mythread(myrun,file_name, time_span, &g_cs);
-	mythread.detach();
-	return true;
+	if (file_name != NULL && strlen(file_name) > 0) {
+		std::thread mythread(myrun, file_name, time_span, &g_cs);
+		mythread.detach();
+		return true;
+	}
+
+	return false;
 }
 
 bool g_running_flag = true;
@@ -282,10 +298,14 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "encoder_rtmp_push failed!\n");
 	}
 
-	encoder_start("E:\\1.MP4");
-	//encoder_start("");
+	encoder_start("-g 640x480 -b 3000 -f 25/1 -gop 25","E:\\1.MP4");
+	int64_t now1 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	while (g_running_flag) {
-		Sleep(500);
+		Sleep(100);
+		int64_t now2 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		if (now2 - now1 > 30) {
+			encoder_output("e:\\svn20160118\\BilliardTrain\\bin\\Debug\\0001-1-1 0#00#00_0_0_0_0_0_0_0_0_00000000-0000-0000-0000-000000000000_{0}.mp4", 25);
+		}
 	}
 
 	encoder_stop();

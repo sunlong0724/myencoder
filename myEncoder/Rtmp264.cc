@@ -143,10 +143,6 @@ int peekUalus(unsigned char *buf, int buf_size, NaluUnit& nalu) {
 
 int CRtmp264:: RTMP264_Send(unsigned char *buf, int buf_size){
 	int bKeyframe = buf[5] == 0x10 ? TRUE : FALSE;
-	//split nalu
-	
-
-
 	if (bKeyframe) {
 		memset(&m_metaData, 0, sizeof(RTMPMetadata));
 		peekSpsAndPps(buf, buf_size);
@@ -311,6 +307,16 @@ int CRtmp264::SendVideoSpsPps(unsigned char *pps, int pps_len, unsigned char * s
 	memcpy(&body[i], pps, pps_len);
 	i += pps_len;
 
+
+	static int j = 0;
+	char name[250];
+	sprintf(name, "e:\\%d.spspps", ++j);
+	FILE* fp = fopen(name, "wb");
+	if (fp) {
+		fwrite(body, 1, i, fp);
+		fclose(fp);
+	}
+
 	packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
 	packet->m_nBodySize = i;
 	packet->m_nChannel = 0x04;
@@ -352,6 +358,7 @@ int CRtmp264::SendH264Packet(unsigned char *data, unsigned int size, int bIsKeyF
 		body[i++] = size & 0xff;
 		// NALU data   
 		memcpy(&body[i], data, size);
+
 		SendVideoSpsPps(m_metaData.Pps, m_metaData.nPpsLen, m_metaData.Sps, m_metaData.nSpsLen);
 	}
 	else {
@@ -371,6 +378,15 @@ int CRtmp264::SendH264Packet(unsigned char *data, unsigned int size, int bIsKeyF
 		memcpy(&body[i], data, size);
 	}
 
+
+	static int j = 0;
+	char name[250];
+	sprintf(name, "e:\\%d.raw", ++j);
+	FILE* fp = fopen(name, "wb");
+	if (fp) {
+		fwrite(body, 1, i + size, fp);
+		fclose(fp);
+	}
 
 	int bRet = SendPacket(RTMP_PACKET_TYPE_VIDEO, body, i + size, nTimeStamp);
 

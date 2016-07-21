@@ -3,6 +3,9 @@
 #include <string>
 #include <windows.h>//avoid include the "windows.h" before the "winsock2.h" 
 
+#define MAX_IAMGE_WIDTH  640
+#define MAX_IMAGE_HEIGHT 480
+
 namespace Memory
 {
 	class SharedMemory

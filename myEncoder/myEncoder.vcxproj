@@ -148,15 +148,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="FFmpegStreamer.h" />
     <ClInclude Include="FFmpegWriter.h" />
     <ClInclude Include="msdk_codec.h" />
     <ClInclude Include="myEncoder.h" />
-    <ClInclude Include="Rtmp264.h" />
     <ClInclude Include="SharedMemory.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="myEncoder.cc" />
-    <ClCompile Include="Rtmp264.cc" />
     <ClCompile Include="SharedMemory.cc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

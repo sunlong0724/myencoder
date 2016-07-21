@@ -11,7 +11,7 @@ extern "C" {
 
 	ENCODER_API bool encoder_rtmp_push(char* addr);
 
-	ENCODER_API bool encoder_start(char* record_file_name);
+	ENCODER_API bool encoder_start(char* parameters,char* record_file_name);
 
 	ENCODER_API bool encoder_stop();
 

@@ -27,7 +27,7 @@
     <ClInclude Include="SharedMemory.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Rtmp264.h">
+    <ClInclude Include="FFmpegStreamer.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -36,9 +36,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="SharedMemory.cc">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Rtmp264.cc">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

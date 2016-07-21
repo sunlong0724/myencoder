@@ -12,8 +12,8 @@ namespace Memory
 #if _FILE_SOURCE
 		m_fp = fopen(file_name.c_str(), "rb");
 		if (m_fp) {
-			width = 1920;
-			height = 1080;
+			width = MAX_IAMGE_WIDTH;
+			height = MAX_IMAGE_HEIGHT;
 			return is_opened = true;;
 		}
 #endif
@@ -21,6 +21,8 @@ namespace Memory
 		is_opened = false;
 		fileMappingHandle = OpenFileMapping(PAGE_READONLY | PAGE_READWRITE, FALSE, file_name.c_str());
 		if (NULL == fileMappingHandle) {
+			DWORD err = GetLastError();
+			printf("OpenFileMapping err:%d\n", err);
 			return is_opened;
 		}
 
