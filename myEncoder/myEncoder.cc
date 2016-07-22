@@ -26,7 +26,9 @@
 #endif
 
 
-#define MAX_CACHE_SECONDS		60*5
+#define MAX_CACHE_SECONDS		60*2
+#define MAX_FPS					25
+
 typedef struct _CustomStruct {
 	CFFmpegWriter			m_ff_writer;
 	CEncodeThread			m_encoder;
@@ -132,7 +134,9 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 	if (buffer_len >= p->m_yuv_image->imageSize) {
 		memcpy(buffer, p->m_yuv_image->imageData, p->m_yuv_image->imageSize);
 		int64_t now5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4);
+		//fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 25 - (now5 - now1)));
 		return p->m_yuv_image->imageSize;
 	}
 #else 
@@ -164,8 +168,13 @@ int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
 	CFFmpegWriter* p_writer = (CFFmpegWriter*)(&p->m_ff_writer);
 
 	//cache every frame
-	int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	int64_t now = time(NULL);// std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	g_cs.m_frames[now].push_back(std::vector<char>(buffer, buffer + buffer_len));//FIXME: maybe race condition!!!
+
+	if (now - g_cs.m_frames.begin()->first >= MAX_CACHE_SECONDS) {
+		g_cs.m_frames.erase(g_cs.m_frames.begin());
+		printf("%d data deleted!\n", g_cs.m_frames.begin()->first);
+	}
 
 	//check wether write videos
 	if (strlen(g_cs.m_record_file) > 0) {
@@ -194,9 +203,6 @@ int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
 			nBytesWritten = buffer_len;
 		}
 	}
-
-
-
 #endif
 	return nBytesWritten;
 }
@@ -242,10 +248,10 @@ ENCODER_API bool encoder_stop() {
 
 void myrun(char* file_name, int time_span, void* ctx) {
 	CustomStruct* p = (CustomStruct*)ctx;
-	int64_t now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	int64_t now = time(NULL);// std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
-	int64_t start = now - time_span;
-	if (p->m_frames.find(now) == p->m_frames.end()) {
+	int64_t start = now - time_span-2;//FIXME:
+	if (p->m_frames.find(start) == p->m_frames.end()) {
 		return;
 	}
 
@@ -253,14 +259,21 @@ void myrun(char* file_name, int time_span, void* ctx) {
 	CFFmpegWriter ffwriter;
 	ffwriter.initialize(g_paramter);
 	ffwriter.create_video_file(file_name);
+	bool wait_key = true;
 
 	while (start < now) {
 		for (int i = 0; i < g_cs.m_frames[start].size(); ++i) {
+			if (wait_key ) {
+				if (g_cs.m_frames[start][i].data()[5] == 0x10) {
+					wait_key = false;
+				}
+				else {
+					continue;
+				}
+			}
 			ffwriter.write_video_frame((unsigned char*)g_cs.m_frames[start][i].data(), g_cs.m_frames[start][i].size(), g_cs.m_frames[start][i].data()[5] == 0x10);
 		}
-		if (now - g_cs.m_frames.begin()->first >= MAX_CACHE_SECONDS) {
-			g_cs.m_frames.erase(start);
-		}
+
 		++start;
 	}
 	ffwriter.close_video_file();
@@ -293,10 +306,10 @@ int main(int argc, char** argv) {
 	signal(SIGINT, sig_cb);  /*×¢²áctrl+cÐÅºÅ²¶»ñº¯Êý*/
 
 	//rtmp://localhost/publishlive/livestream;
-	char* rtmp_push_url = "rtmp://2453.livepush.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a?bizid=2453";
-	if (false == encoder_rtmp_push(rtmp_push_url)) {
-		fprintf(stderr, "encoder_rtmp_push failed!\n");
-	}
+	//char* rtmp_push_url = "rtmp://2453.livepush.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a?bizid=2453";
+	//if (false == encoder_rtmp_push(rtmp_push_url)) {
+	//	fprintf(stderr, "encoder_rtmp_push failed!\n");
+	//}
 
 	encoder_start("-g 640x480 -b 3000 -f 25/1 -gop 25","E:\\1.MP4");
 	int64_t now1 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -304,7 +317,10 @@ int main(int argc, char** argv) {
 		Sleep(100);
 		int64_t now2 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 		if (now2 - now1 > 30) {
-			encoder_output("e:\\svn20160118\\BilliardTrain\\bin\\Debug\\0001-1-1 0#00#00_0_0_0_0_0_0_0_0_00000000-0000-0000-0000-000000000000_{0}.mp4", 25);
+			now1 = now2;
+			char name[256];
+			sprintf(name, "e:\\svn20160118\\BilliardTrain\\bin\\Debug\\0001-1-1 0#00#00_0_0_0_0_0_0_0_0_00000000-0000-0000-0000-000000000000_{%d}.mp4", now2);
+			encoder_output(name, 20);
 		}
 	}
 

@@ -1,6 +1,0 @@
-E:\workspace\myencoder\output\test_codec.exe.config
-E:\workspace\myencoder\output\test_codec.exe
-E:\workspace\myencoder\output\test_codec.pdb
-E:\workspace\myencoder\test_codec\obj\Debug\test_codec.csprojResolveAssemblyReference.cache
-E:\workspace\myencoder\test_codec\obj\Debug\test_codec.exe
-E:\workspace\myencoder\test_codec\obj\Debug\test_codec.pdb

@@ -26,13 +26,13 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -73,7 +73,8 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\output\</OutDir>
     <IntDir>$(OutDir)\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\3rdParty\opencv\include;include;3rdParty\ffmpeg_x86\include;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);;3rdParty\codec\include;3rdParty\ffmpeg_x86\include;3rdParty\opencv\include</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;3rdParty\codec\lib;3rdParty\opencv\lib;3rdParty\ffmpeg_x86\lib;</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -82,7 +83,8 @@
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\output\</OutDir>
     <IntDir>$(OutDir)\$(ProjectName)\$(Configuration)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\..\3rdParty\opencv\include;include;3rdParty\ffmpeg_x86\include;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);3rdParty\codec\include;3rdParty\ffmpeg_x86\include;3rdParty\opencv\include</IncludePath>
+    <LibraryPath>3rdParty\codec\lib;3rdParty\opencv\lib;3rdParty\ffmpeg_x86\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -121,7 +123,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>_FILE_SOURCE;EXPORT_API_DLL;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>EXPORT_API_DLL;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -148,9 +150,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="FFmpegStreamer.h" />
-    <ClInclude Include="FFmpegWriter.h" />
-    <ClInclude Include="msdk_codec.h" />
+    <ClInclude Include="3rdParty\codec\include\FFmpegStreamer.h" />
+    <ClInclude Include="3rdParty\codec\include\FFmpegWriter.h" />
+    <ClInclude Include="3rdParty\codec\include\msdk_codec.h" />
     <ClInclude Include="myEncoder.h" />
     <ClInclude Include="SharedMemory.h" />
   </ItemGroup>

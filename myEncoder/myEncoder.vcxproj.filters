@@ -18,16 +18,16 @@
     <ClInclude Include="myEncoder.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="FFmpegWriter.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="msdk_codec.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="SharedMemory.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="FFmpegStreamer.h">
+    <ClInclude Include="3rdParty\codec\include\FFmpegStreamer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\codec\include\FFmpegWriter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\codec\include\msdk_codec.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
