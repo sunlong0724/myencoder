@@ -25,4 +25,9 @@
 */Debug
 */*.db
 *.exe
+*/obj
+*.bak
+*.dll
+*.lib
+*/obj/*
 ffmpeg_writer/ffmpeg_writer/3rdParty/*

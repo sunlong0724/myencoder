@@ -17,19 +17,15 @@ namespace testApi
             string parameter = "-g 640x480 -b 3000 -f 25/1 -gop 25";
             string record_file = "E:\\1.MP4";
 
-            int time_span = 1*15;
+            int time_span = 1*50;
+
+            CFunction.encoder_rtmp_push(rtmp_push_url);
             CFunction.encoder_start(parameter, record_file);
-            //string image_file = "E:\\workspace\\encoder\\HappyFish.jpg";
-            //string image_file = "E:\\workspace\\encoder\\HappyFish.png";
-           // CFunction.encoder_add_image0(image_file,100,100, 0.5);
-            //CFunction.encoder_set_image_position(1100,100,0,0 );
 
             int i = 0;
              while (true) {
-             //CFunction.encoder_set_fontcolor(0, 188, 177, 188);
-             //CFunction.encoder_overlap("爱奇艺", 1100, 80, 10);
                 Thread.Sleep((time_span + 1) * 1000);
-                string format = "e:\\svn20160118\\BilliardTrain\\bin\\Debug\\0001-1-1 0#00#00_0_0_0_0_0_0_0_0_00000000-0000-0000-0000-000000000000_{0}.mp4";
+                string format = "e:\\svn20160118\\BilliardTrain\\bin\\Debug\\0000-0000-0000-000000000000_{0}.mp4";
                 string file_name = string.Format(format, ++i);
                 int ret = CFunction.encoder_output(file_name,time_span-10);
                 System.Console.Write("ret:{0}", ret);

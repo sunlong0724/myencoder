@@ -134,7 +134,7 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 	if (buffer_len >= p->m_yuv_image->imageSize) {
 		memcpy(buffer, p->m_yuv_image->imageData, p->m_yuv_image->imageSize);
 		int64_t now5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		//fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4);
+		fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4);
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 25 - (now5 - now1)));
 		return p->m_yuv_image->imageSize;
@@ -185,6 +185,7 @@ int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
 		nBytesWritten = buffer_len;
 	}
 
+	//printf("%s url:%s\n", __FUNCTION__, g_cs.m_url);
 	if (strlen(g_cs.m_url) > 0) {
 		static bool flag = true;
 		if (flag) {
@@ -221,7 +222,7 @@ ENCODER_API bool encoder_start(char* parameters, char* record_file_name) {
 	if (record_file_name != NULL) {
 		strcpy(g_cs.m_record_file, record_file_name);
 		g_cs.m_ff_writer.initialize(g_paramter);
-		g_cs.m_ff_writer.create_video_file(record_file_name);
+		g_cs.m_ff_writer.create_video_file(g_cs.m_record_file);
 	}
 
 	g_cs.m_encoder.init(g_paramter.data());
@@ -246,7 +247,13 @@ ENCODER_API bool encoder_stop() {
 	return true;
 }
 
-void myrun(char* file_name, int time_span, void* ctx) {
+void myrun(char* file_name1, int time_span, void* ctx) {
+	
+	char file_name[1024];
+	strcpy(file_name, file_name1);
+
+	printf("%s name:%s span:%d\n", __FUNCTION__, file_name, time_span);
+
 	CustomStruct* p = (CustomStruct*)ctx;
 	int64_t now = time(NULL);// std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
@@ -306,10 +313,10 @@ int main(int argc, char** argv) {
 	signal(SIGINT, sig_cb);  /*×¢²áctrl+cÐÅºÅ²¶»ñº¯Êý*/
 
 	//rtmp://localhost/publishlive/livestream;
-	//char* rtmp_push_url = "rtmp://2453.livepush.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a?bizid=2453";
-	//if (false == encoder_rtmp_push(rtmp_push_url)) {
-	//	fprintf(stderr, "encoder_rtmp_push failed!\n");
-	//}
+	char* rtmp_push_url = "rtmp://2453.livepush.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a?bizid=2453";
+	if (false == encoder_rtmp_push(rtmp_push_url)) {
+		fprintf(stderr, "encoder_rtmp_push failed!\n");
+	}
 
 	encoder_start("-g 640x480 -b 3000 -f 25/1 -gop 25","E:\\1.MP4");
 	int64_t now1 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
