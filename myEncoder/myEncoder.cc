@@ -313,7 +313,7 @@ int main(int argc, char** argv) {
 	signal(SIGINT, sig_cb);  /*×¢²áctrl+cÐÅºÅ²¶»ñº¯Êý*/
 
 	//rtmp://localhost/publishlive/livestream;
-	char* rtmp_push_url = "rtmp://2453.livepush.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a?bizid=2453";
+	char* rtmp_push_url = "";
 	if (false == encoder_rtmp_push(rtmp_push_url)) {
 		fprintf(stderr, "encoder_rtmp_push failed!\n");
 	}
