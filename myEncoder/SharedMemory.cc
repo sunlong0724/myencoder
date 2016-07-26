@@ -4,7 +4,7 @@
 
 namespace Memory
 {
-	const char* SharedMemory::DEFAULT_STREAMNAME = "Eagle_VideoStream";
+	std::string SharedMemory::DEFAULT_STREAMNAME = "Eagle_VideoStream";
 
 	SharedMemory::SharedMemory():is_opened(false){}
 
@@ -22,7 +22,7 @@ namespace Memory
 		fileMappingHandle = OpenFileMapping(PAGE_READONLY | PAGE_READWRITE, FALSE, file_name.c_str());
 		if (NULL == fileMappingHandle) {
 			DWORD err = GetLastError();
-			printf("OpenFileMapping err:%d\n", err);
+			printf("OpenFileMapping(%s) err:%d\n", file_name.c_str(),err);
 			return is_opened;
 		}
 
@@ -63,6 +63,7 @@ namespace Memory
 #endif
 
 
+	again:
 		int head = getHeadPos();
 		int tail = getTailPos();
 
@@ -71,7 +72,9 @@ namespace Memory
 
 		if (last_read == want ) {
 			//cout << "last_read:" << last_read << ",want:" << want << endl;
-			return 0;
+			//Sleep(1);
+			goto again;
+			//return 0;
 		}
 
 		//cout << "get frame number:" << want << endl;
@@ -79,8 +82,8 @@ namespace Memory
 		//int pos = 48;
 		if (fileMappingView && buffer) {
 			memcpy(buffer, fileMappingView + pos, size);
-#if 0
-			setHeadPos((want_head +1) % buffer_len);
+#if 0 //FIXME:
+			setHeadPos((want +1) % buffer_len);
 
 #endif
 		}

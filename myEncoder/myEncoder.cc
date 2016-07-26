@@ -8,16 +8,18 @@
 #include <signal.h>
 
 
-#pragma comment(lib, "msdk_codec.lib")
-
 #pragma comment(lib, "ws2_32.lib")
 #ifdef _DEBUG
+#define MAX_CACHE_SECONDS		60*2
+#pragma comment(lib, "msdk_codecd.lib")
 #pragma comment(lib, "ffmpeg_writerd.lib")
 #pragma comment(lib, "opencv_highgui246d.lib")
 #pragma comment(lib, "opencv_imgproc246d.lib")
 #pragma comment(lib, "opencv_core246d.lib")
-#pragma comment(lib, "ffmpeg_streamerD.lib")
+#pragma comment(lib, "ffmpeg_streamerd.lib")
 #else
+#define MAX_CACHE_SECONDS		60*2//10
+#pragma comment(lib, "msdk_codec.lib")
 #pragma comment(lib, "ffmpeg_writer.lib")
 #pragma comment(lib, "opencv_highgui246.lib")
 #pragma comment(lib, "opencv_imgproc246.lib")
@@ -25,8 +27,6 @@
 #pragma comment(lib, "ffmpeg_streamer.lib")
 #endif
 
-
-#define MAX_CACHE_SECONDS		60*2
 #define MAX_FPS					25
 
 typedef struct _CustomStruct {
@@ -52,6 +52,7 @@ typedef struct _CustomStruct {
 
 	char					m_url[2048];
 
+	int64_t					m_last_read;
 	_CustomStruct() {
 		m_rgb_buf = NULL;
 		m_rgb_buf_len = 0;
@@ -113,8 +114,9 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 	}
 
 #if 1
-	int64_t now1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	int64_t now1  = p->m_last_read  = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	if (0 == p->m_sm.read((unsigned char*)p->m_rgb_buf, p->m_rgb_buf_len)) {
+		fprintf(stdout,"It's no possiable here 1!!!\n");
 		return 0;
 	}
 	int64_t now2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -131,12 +133,13 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 	//cvShowImage("win", p->m_yuv_image);
 	//cvWaitKey(1);
 
+	//fprintf(stdout,"%s %d %d\n", __FUNCTION__, buffer_len, p->m_yuv_image->imageSize);
 	if (buffer_len >= p->m_yuv_image->imageSize) {
 		memcpy(buffer, p->m_yuv_image->imageData, p->m_yuv_image->imageSize);
-		int64_t now5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-		fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4);
+		//int64_t now5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		//fprintf(stdout, "%s time read:%lld downup:%lld, cvt:%lld, cp2:%lld, sleep:%lld\n", __FUNCTION__, now2 - now1, now3-now2, now4-now3, now5-now4, 1000 / MAX_FPS - (now5 - now1));
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 25 - (now5 - now1)));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(1000 / MAX_FPS - (now5 - now1)));
 		return p->m_yuv_image->imageSize;
 	}
 #else 
@@ -147,6 +150,8 @@ int ReadNextFrame(void* buffer, int32_t buffer_len, void* ctx) {
 		return buffer_len;
 	}
 #endif
+
+	fprintf(stdout,"It's no possiable here 2!!!\n");
 	return 0;
 }
 
@@ -205,6 +210,12 @@ int32_t WriteNextFrame(unsigned char* buffer, int32_t buffer_len, void*  ctx) {
 		}
 	}
 #endif
+
+	int64_t now0 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	if (1000 / MAX_FPS > now0 - g_cs.m_last_read) {
+		fprintf(stdout, "%s sleep:%lld \n", __FUNCTION__, 1000 / MAX_FPS - (now0 - g_cs.m_last_read));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000 / MAX_FPS - (now0 - g_cs.m_last_read)));
+	}
 	return nBytesWritten;
 }
 
@@ -215,8 +226,6 @@ ENCODER_API bool encoder_rtmp_push(char* url) {
 
 
 ENCODER_API bool encoder_start(char* parameters, char* record_file_name) {
-	//std::string paramter("-g 1920x1080 -b 3000 -f 25/1 -gop 25");
-	//std::string paramter("-g 1920x1080 -b 3000 -f 30/1 -gop 45");
 	g_paramter.assign(parameters);
 
 	if (record_file_name != NULL) {
@@ -262,8 +271,7 @@ void myrun(char* file_name1, int time_span, void* ctx) {
 		return;
 	}
 
-	
-	CFFmpegWriter ffwriter;
+	CFFmpegWriter ffwriter;// can be removed to CustomStruct;
 	ffwriter.initialize(g_paramter);
 	ffwriter.create_video_file(file_name);
 	bool wait_key = true;
@@ -300,8 +308,7 @@ ENCODER_API bool encoder_output(char* file_name, int time_span) {
 }
 
 bool g_running_flag = true;
-void sig_cb(int sig)
-{
+void sig_cb(int sig) {
 	if (sig == SIGINT) {
 		fprintf(stdout, "%s\n", __FUNCTION__);
 		g_running_flag = false;
@@ -313,12 +320,12 @@ int main(int argc, char** argv) {
 	signal(SIGINT, sig_cb);  /*×¢²áctrl+cÐÅºÅ²¶»ñº¯Êý*/
 
 	//rtmp://localhost/publishlive/livestream;
-	char* rtmp_push_url = "";
-	if (false == encoder_rtmp_push(rtmp_push_url)) {
-		fprintf(stderr, "encoder_rtmp_push failed!\n");
-	}
+	//char* rtmp_push_url = "rtmp://2453.liveplay.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a";
+	//if (false == encoder_rtmp_push(rtmp_push_url)) {
+	//	fprintf(stderr, "encoder_rtmp_push failed!\n");
+	//}
 
-	encoder_start("-g 640x480 -b 3000 -f 25/1 -gop 25","E:\\1.MP4");
+	encoder_start("-g 1392x816 -b 3000 -f 25/1 -gop 25","E:\\1.MP4");
 	int64_t now1 = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	while (g_running_flag) {
 		Sleep(100);

@@ -13,8 +13,8 @@ namespace testApi
     {
         static void Main(string[] args)
         {
-            string rtmp_push_url = "";
-            string parameter = "-g 640x480 -b 3000 -f 25/1 -gop 25";
+            string rtmp_push_url = "rtmp://2453.liveplay.myqcloud.com/live/2453_993e47c3f64311e5b91fa4dcbef5e35a";
+            string parameter = "-g 1392x816 -b 3000 -f 25/1 -gop 25";
             string record_file = "E:\\1.MP4";
 
             int time_span = 1*50;

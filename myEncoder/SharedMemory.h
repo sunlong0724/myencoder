@@ -17,7 +17,7 @@ namespace Memory
 		//SharedMemory& operate = (SharedMemory& rhs) = delete;
 
 	
-		static const char*  DEFAULT_STREAMNAME;
+		static std::string  DEFAULT_STREAMNAME;
 		HANDLE				fileMappingHandle;
 		unsigned char*		fileMappingView;
 

@@ -32,3 +32,5 @@
 */obj/*
 ffmpeg_writer/ffmpeg_writer/3rdParty/*
 /output/myEncoder
+/test
+/output
